@@ -61,7 +61,19 @@ class YelpClient(object):
         total, spots = self.process_query(res)
 
         if len(spots) >= total:
-            return spots
+            df = pd.json_normalize(spots)
+            cols = []
+            for c in df.columns:
+                if '.' in c:
+                    cols.append(c.split('.')[1])
+                else:
+                    cols.append(c)
+            df.columns = cols
+
+            df.loc[:, 'tdate'] = datetime.today()
+
+            return df
+
         final = spots
 
         while len(final) <= total and len(spots) > 0:
@@ -99,16 +111,23 @@ class YelpClient(object):
 if __name__ == '__main__':
     from sqlalchemy import create_engine
     from sqlalchemy.engine.url import URL
+    import pandas as pd
+
+    df = pd.read_csv('neighbourhoods.csv')
+    dct = dict(zip(df['neighbourhood'], df['neighbourhood_group']))
 
     clt = YelpClient(DevelopmentConfig.yelp_api_key)
 
     url = "/businesses/yelp-san-francisco"
 
-    res = clt.get_spots('restaurant', 'flushing')
+    for neighbourhood, neighbourhood_group in dct.items():
+        print(neighbourhood, neighbourhood_group)
 
-    engine = create_engine(URL(**ProductionConfig().DATABASE))
+        res = clt.get_spots('restaurant', neighbourhood + ' ' + neighbourhood_group + 'New York')
 
-    res.to_sql('yelp_restaurants', con=engine, schema='dbo', if_exists='append', index=False)
+        engine = create_engine(URL(**ProductionConfig().DATABASE))
+
+        res.to_sql('yelp_restaurants', con=engine, schema='dbo', if_exists='append', index=False)
 
 
 
